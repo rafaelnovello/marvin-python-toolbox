@@ -117,7 +117,7 @@ CLAZZES = {
     "ppreparator": "PredictionPreparator",
     "predictor": "Predictor",
     "feedback": "Feedback"
-} 
+}
 
 
 class MarvinDryRun(object):
@@ -566,16 +566,17 @@ def _call_git_init(dest):
 @click.option('--dataset', '-d', help='Dataset file path', type=click.Path(exists=True))
 @click.option('--model', '-m', help='Engine model file path', type=click.Path(exists=True))
 @click.option('--metrics', '-me', help='Engine Metrics file path', type=click.Path(exists=True))
+@click.option('--model-protocol', '-mp', default='', help='Marvin model protocol to be loaded during initialization.')
 @click.option('--params-file', '-pf', default='engine.params', help='Marvin engine params file path', type=click.Path(exists=True))
 @click.option('--spark-conf', '-c', default='/opt/spark/conf', type=click.Path(exists=True), help='Spark configuration folder path to be used in this session')
-@click.option('--http_host', '-h', default='localhost', help='Engine executor http bind host')
-@click.option('--http_port', '-p', default=8000, help='Engine executor http port')
+@click.option('--http-host', '-h', default='localhost', help='Engine executor http bind host')
+@click.option('--http-port', '-p', default=8000, help='Engine executor http port')
 @click.option('--executor-path', '-e', help='Marvin engine executor jar path', type=click.Path(exists=True))
 @click.option('--max-workers', '-w', default=multiprocessing.cpu_count(), help='Max number of grpc threads workers per action')
 @click.option('--max-rpc-workers', '-rw', default=multiprocessing.cpu_count(), help='Max number of grpc workers per action')
 @click.pass_context
 def engine_httpserver(ctx, action, params_file, initial_dataset, dataset,
-                      model, metrics, spark_conf, http_host, http_port,
+                      model, metrics, model_protocol, spark_conf, http_host, http_port,
                       executor_path, max_workers, max_rpc_workers):
     logger.info("Starting http and grpc servers ...")
 
@@ -583,7 +584,9 @@ def engine_httpserver(ctx, action, params_file, initial_dataset, dataset,
     httpserver = None
 
     try:
-        grpcserver = subprocess.Popen(['marvin', 'engine-grpcserver', '-a', action, '-w', str(max_workers), '-rw', str(max_rpc_workers)])
+        optional_args = generate_rpc_args_params_string(id=initial_dataset, d=dataset, m=model, me=metrics, pf=params_file)
+        grpcserver = subprocess.Popen(['marvin', 'engine-grpcserver', '-a', action,
+            '-w', str(max_workers), '-rw', str(max_rpc_workers)] + optional_args)
         time.sleep(3)
 
     except:
@@ -600,6 +603,7 @@ def engine_httpserver(ctx, action, params_file, initial_dataset, dataset,
             '-DmarvinConfig.engineHome={}'.format(ctx.obj['config']['inidir']),
             '-DmarvinConfig.ipAddress={}'.format(http_host),
             '-DmarvinConfig.port={}'.format(http_port),
+            '-DmarvinConfig.modelProtocol={}'.format(model_protocol),
             '-jar',
             executor_path])
 
@@ -618,6 +622,14 @@ def engine_httpserver(ctx, action, params_file, initial_dataset, dataset,
         logger.info("Http and grpc servers terminated!")
         sys.exit(0)
 
+def generate_rpc_args_params_string(**kwargs):
+    params = []
+    if kwargs is not None:
+        for key,value in kwargs.iteritems():
+            if value is not None:
+                params.append("-{0}".format(str(key)))
+                params.append(str(value))
+    return params
 
 @cli.command('engine-deploy', help='Engine provisioning and deployment command')
 @click.option('--provision', is_flag=True, default=False, help='Forces provisioning')
