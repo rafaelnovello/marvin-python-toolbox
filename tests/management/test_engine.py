@@ -22,13 +22,18 @@ try:
 except ImportError:
     import unittest.mock as mock
 
+from mock import call
 
 from marvin_python_toolbox.management.engine import MarvinDryRun
 from marvin_python_toolbox.management.engine import dryrun
+from marvin_python_toolbox.management.engine import engine_httpserver
 
 
 class mocked_ctx(object):
-    obj = {'package_name': 'test_package'}
+    obj = {'package_name': 'test_package',
+           'config': {
+                'inidir': 'test_dir'
+           }}
 
 
 class mocked_acquisitor():
@@ -107,3 +112,31 @@ def test_marvindryrun(import_mocked, dumps_mocked):
     test_dryrun.execute(clazz=clazz, params=None, initial_dataset=None, dataset=None, model=None, metrics=None, profiling_enabled=False)
 
     dumps_mocked.assert_called_with(None, indent=4, sort_keys=True)
+
+
+@mock.patch('marvin_python_toolbox.management.engine.TESTING')
+@mock.patch('marvin_python_toolbox.management.engine.MarvinData')
+@mock.patch('marvin_python_toolbox.management.engine.Config')
+@mock.patch('marvin_python_toolbox.management.engine.subprocess.Popen')
+def test_engine_httpserver(Popen_mocked, Config_mocked, MarvinData_mocked, TESTING_mocked):
+    TESTING_mocked.return_value = True
+    engine_httpserver(ctx=mocked_ctx, action='all', params_file='test_params', initial_dataset='test_id',
+        dataset='test_d', model='test_m', metrics='test_me', model_protocol='test_protocol',
+        spark_conf='test_conf', http_host='test_host', http_port=9999, executor_path='test_executor',
+        max_workers=9, max_rpc_workers=99)
+
+    expected_calls = []
+    expected_calls.append(call(['marvin', 'engine-grpcserver', '-a', 'all', '-w', '9','-rw', '99',
+        '-me', 'test_me', '-pf', 'test_params', '-m', 'test_m', '-id', 'test_id',
+        '-d', 'test_d']))
+
+    expected_calls.append(call([
+        'java',
+        '-DmarvinConfig.engineHome=test_dir',
+        '-DmarvinConfig.ipAddress=test_host',
+        '-DmarvinConfig.port=9999',
+        '-DmarvinConfig.modelProtocol=test_protocol',
+        '-jar',
+        MarvinData_mocked.download_file('test_executor')]))
+
+    Popen_mocked.assert_has_calls(expected_calls)
