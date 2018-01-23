@@ -557,7 +557,37 @@ def _call_git_init(dest):
         print('WARNING: Could not initialize repository!')
 
 
-def engine_httpserver(ctx, action, params_file, initial_dataset, dataset, model, metrics, model_protocol, spark_conf, http_host,
+@cli.command('engine-httpserver', help='Marvin http api server starts')
+@click.option(
+    '--action',
+    '-a',
+    default='all',
+    type=click.Choice(['all', 'acquisitor', 'tpreparator', 'trainer', 'evaluator', 'ppreparator', 'predictor', 'feedback']),
+    help='Marvin engine action name')
+@click.option('--initial-dataset', '-id', help='Initial dataset file path', type=click.Path(exists=True))
+@click.option('--dataset', '-d', help='Dataset file path', type=click.Path(exists=True))
+@click.option('--model', '-m', help='Engine model file path', type=click.Path(exists=True))
+@click.option('--metrics', '-me', help='Engine Metrics file path', type=click.Path(exists=True))
+@click.option('--protocol', '-pr', default='', help='Marvin protocol to be loaded during initialization.')
+@click.option('--params-file', '-pf', default='engine.params', help='Marvin engine params file path', type=click.Path(exists=True))
+@click.option('--spark-conf', '-c', envvar='SPARK_HOME', type=click.Path(exists=True), help='Spark configuration folder path to be used in this session')
+@click.option('--http-host', '-h', default='localhost', help='Engine executor http bind host')
+@click.option('--http-port', '-p', default=8000, help='Engine executor http port')
+@click.option('--executor-path', '-e', help='Marvin engine executor jar path', type=click.Path(exists=True))
+@click.option('--max-workers', '-w', default=multiprocessing.cpu_count(), help='Max number of grpc threads workers per action')
+@click.option('--max-rpc-workers', '-rw', default=multiprocessing.cpu_count(), help='Max number of grpc workers per action')
+@click.pass_context
+def engine_httpserver_cli(ctx, action, params_file, initial_dataset, dataset,
+                          model, metrics, protocol, spark_conf, http_host, http_port,
+                          executor_path, max_workers, max_rpc_workers):
+    engine_httpserver(
+        ctx, action, params_file, initial_dataset, dataset,
+        model, metrics, protocol, spark_conf, http_host, http_port,
+        executor_path, max_workers, max_rpc_workers
+    )
+
+
+def engine_httpserver(ctx, action, params_file, initial_dataset, dataset, model, metrics, protocol, spark_conf, http_host,
                       http_port, executor_path, max_workers, max_rpc_workers):
     logger.info("Starting http and grpc servers ...")
 
@@ -593,7 +623,7 @@ def engine_httpserver(ctx, action, params_file, initial_dataset, dataset, model,
             '-DmarvinConfig.engineHome={}'.format(ctx.obj['config']['inidir']),
             '-DmarvinConfig.ipAddress={}'.format(http_host),
             '-DmarvinConfig.port={}'.format(http_port),
-            '-DmarvinConfig.modelProtocol={}'.format(model_protocol),
+            '-DmarvinConfig.modelProtocol={}'.format(protocol),
             '-jar',
             executor_path])
 
@@ -612,36 +642,6 @@ def engine_httpserver(ctx, action, params_file, initial_dataset, dataset, model,
         httpserver.terminate() if httpserver else None
         logger.info("Http and grpc servers terminated!")
         sys.exit(0)
-
-
-@cli.command('engine-httpserver', help='Marvin http api server starts')
-@click.option(
-    '--action',
-    '-a',
-    default='all',
-    type=click.Choice(['all', 'acquisitor', 'tpreparator', 'trainer', 'evaluator', 'ppreparator', 'predictor', 'feedback']),
-    help='Marvin engine action name')
-@click.option('--initial-dataset', '-id', help='Initial dataset file path', type=click.Path(exists=True))
-@click.option('--dataset', '-d', help='Dataset file path', type=click.Path(exists=True))
-@click.option('--model', '-m', help='Engine model file path', type=click.Path(exists=True))
-@click.option('--metrics', '-me', help='Engine Metrics file path', type=click.Path(exists=True))
-@click.option('--model-protocol', '-mp', default='', help='Marvin model protocol to be loaded during initialization.')
-@click.option('--params-file', '-pf', default='engine.params', help='Marvin engine params file path', type=click.Path(exists=True))
-@click.option('--spark-conf', '-c', envvar='SPARK_HOME', type=click.Path(exists=True), help='Spark configuration folder path to be used in this session')
-@click.option('--http-host', '-h', default='localhost', help='Engine executor http bind host')
-@click.option('--http-port', '-p', default=8000, help='Engine executor http port')
-@click.option('--executor-path', '-e', help='Marvin engine executor jar path', type=click.Path(exists=True))
-@click.option('--max-workers', '-w', default=multiprocessing.cpu_count(), help='Max number of grpc threads workers per action')
-@click.option('--max-rpc-workers', '-rw', default=multiprocessing.cpu_count(), help='Max number of grpc workers per action')
-@click.pass_context
-def engine_httpserver_cli(ctx, action, params_file, initial_dataset, dataset,
-                          model, metrics, model_protocol, spark_conf, http_host, http_port,
-                          executor_path, max_workers, max_rpc_workers):
-    engine_httpserver(
-        ctx, action, params_file, initial_dataset, dataset,
-        model, metrics, model_protocol, spark_conf, http_host, http_port,
-        executor_path, max_workers, max_rpc_workers
-    )
 
 
 @cli.command('engine-deploy', help='Engine provisioning and deployment command')

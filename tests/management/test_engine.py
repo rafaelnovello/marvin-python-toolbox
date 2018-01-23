@@ -127,7 +127,7 @@ def test_engine_httpserver(Popen_mocked, Config_mocked, MarvinData_mocked, sleep
     sleep_mocked.side_effect = mocked_sleep
 
     engine_httpserver(ctx=mocked_ctx, action='all', params_file='test_params', initial_dataset='test_id', dataset='test_d', model='test_m', metrics='test_me',
-                      model_protocol='test_protocol', spark_conf='test_conf', http_host='test_host', http_port=9999, executor_path='test_executor',
+                      protocol='test_protocol', spark_conf='test_conf', http_host='test_host', http_port=9999, executor_path='test_executor',
                       max_workers=9, max_rpc_workers=99)
 
     expected_calls = []
