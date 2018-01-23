@@ -44,8 +44,6 @@ MARVIN_DATA_PATH = os.getenv('MARVIN_DATA_PATH')
 
 TOOLBOX_VERSION = "0.0.1"
 
-TESTING = False
-
 
 @click.group('engine')
 def cli():
@@ -68,7 +66,7 @@ def cli():
 @click.option('--feedback-file', '-ff', default='feedback.messages', help='Marvin engine feedback input messages file path', type=click.Path(exists=True))
 @click.option('--response', '-r', default=True, is_flag=True, help='If enable, print responses from engine online actions (ppreparator and predictor)')
 @click.option('--profiling', default=False, is_flag=True, help='Enable execute method profiling')
-@click.option('--spark-conf', '-c', default='/opt/spark/conf', type=click.Path(exists=True), help='Spark configuration folder path to be used in this session')
+@click.option('--spark-conf', '-c', envvar='SPARK_HOME', type=click.Path(exists=True), help='Spark configuration folder path to be used in this session')
 @click.pass_context
 def dryrun_cli(ctx, action, params_file, messages_file, feedback_file, initial_dataset, dataset, model, metrics, response, spark_conf, profiling):
     dryrun(ctx, action, params_file, messages_file, feedback_file, initial_dataset, dataset, model, metrics, response, spark_conf, profiling)
@@ -87,11 +85,11 @@ def dryrun(ctx, action, params_file, messages_file, feedback_file, initial_datas
     feedback_file = read_file(feedback_file)
 
     if action in ['all', 'ppreparator', 'predictor'] and not messages_file:
-        print('Please, set the input message to be used by the dry run process. Use --input_message flag to informe in a json valid form.')
+        print('Please, set the input message to be used by the dry run process. Use --messages-file flag to informe in a json valid form.')
         sys.exit("Stoping process!")
 
     if action in ['all', 'feedback'] and not feedback_file:
-        print('Please, set the feedback input message to be used by the dry run process. Use --input_message flag to informe in a json valid form.')
+        print('Please, set the feedback input message to be used by the dry run process. Use --feedback-file flag to informe in a json valid form.')
         sys.exit("Stoping process!")
 
     if action == 'all':
@@ -104,7 +102,8 @@ def dryrun(ctx, action, params_file, messages_file, feedback_file, initial_datas
     initial_start_time = time.time()
 
     for step in pipeline:
-        _dryrun.execute(clazz=CLAZZES[step], params=params, initial_dataset=initial_dataset, dataset=dataset, model=model, metrics=metrics, profiling_enabled=profiling)
+        _dryrun.execute(clazz=CLAZZES[step], params=params, initial_dataset=initial_dataset, dataset=dataset, model=model, metrics=metrics,
+                        profiling_enabled=profiling)
 
     print("Total Time : {:.2f}s".format(time.time() - initial_start_time))
 
@@ -291,7 +290,7 @@ class MarvinEngineServer(object):
 @click.option('--metrics', '-me', help='Engine Metrics file path', type=click.Path(exists=True))
 @click.option('--params-file', '-pf', default='engine.params', help='Marvin engine params file path', type=click.Path(exists=True))
 @click.option('--metadata-file', '-mf', default='engine.metadata', help='Marvin engine metadata file path', type=click.Path(exists=True))
-@click.option('--spark-conf', '-c', default='/opt/spark/conf', type=click.Path(exists=True), help='Spark configuration folder path to be used in this session')
+@click.option('--spark-conf', '-c', envvar='SPARK_HOME', type=click.Path(exists=True), help='Spark configuration folder path to be used in this session')
 @click.option('--max-workers', '-w', default=multiprocessing.cpu_count(), help='Max number of grpc threads workers per action')
 @click.option('--max-rpc-workers', '-rw', default=multiprocessing.cpu_count(), help='Max number of grpc workers per action')
 @click.pass_context
@@ -333,7 +332,8 @@ def engine_server(ctx, action, params_file, metadata_file, initial_dataset, data
 
     try:
         while True:
-            time.sleep(10)
+            time.sleep(100)
+
     except KeyboardInterrupt:
         print("Terminating server ...")
         for server in servers:
@@ -557,18 +557,26 @@ def _call_git_init(dest):
         print('WARNING: Could not initialize repository!')
 
 
-def engine_httpserver(ctx, action, params_file, initial_dataset, dataset,
-                      model, metrics, model_protocol, spark_conf, http_host, http_port,
-                      executor_path, max_workers, max_rpc_workers):
+def engine_httpserver(ctx, action, params_file, initial_dataset, dataset, model, metrics, model_protocol, spark_conf, http_host,
+                      http_port, executor_path, max_workers, max_rpc_workers):
     logger.info("Starting http and grpc servers ...")
 
     grpcserver = None
     httpserver = None
 
+    def _params(**kwargs):
+        params = []
+        if kwargs is not None:
+            for key, value in kwargs.iteritems():
+                if value is not None:
+                    params.append("-{0}".format(str(key)))
+                    params.append(str(value))
+        return params
+
     try:
-        optional_args = generate_rpc_args_params_string(id=initial_dataset, d=dataset, m=model, me=metrics, pf=params_file)
-        grpcserver = subprocess.Popen(['marvin', 'engine-grpcserver', '-a', action,
-            '-w', str(max_workers), '-rw', str(max_rpc_workers)] + optional_args)
+        optional_args = _params(id=initial_dataset, d=dataset, m=model, me=metrics, pf=params_file)
+        grpcserver = subprocess.Popen(['marvin', 'engine-grpcserver', '-a', action, '-w', str(max_workers), '-rw', str(max_rpc_workers)] + optional_args)
+
         time.sleep(3)
 
     except:
@@ -595,8 +603,9 @@ def engine_httpserver(ctx, action, params_file, initial_dataset, dataset,
         sys.exit(1)
 
     try:
-        while True and not TESTING:
+        while True:
             time.sleep(100)
+
     except KeyboardInterrupt:
         logger.info("Terminating http and grpc servers...")
         grpcserver.terminate() if grpcserver else None
@@ -618,7 +627,7 @@ def engine_httpserver(ctx, action, params_file, initial_dataset, dataset,
 @click.option('--metrics', '-me', help='Engine Metrics file path', type=click.Path(exists=True))
 @click.option('--model-protocol', '-mp', default='', help='Marvin model protocol to be loaded during initialization.')
 @click.option('--params-file', '-pf', default='engine.params', help='Marvin engine params file path', type=click.Path(exists=True))
-@click.option('--spark-conf', '-c', default='/opt/spark/conf', type=click.Path(exists=True), help='Spark configuration folder path to be used in this session')
+@click.option('--spark-conf', '-c', envvar='SPARK_HOME', type=click.Path(exists=True), help='Spark configuration folder path to be used in this session')
 @click.option('--http-host', '-h', default='localhost', help='Engine executor http bind host')
 @click.option('--http-port', '-p', default=8000, help='Engine executor http port')
 @click.option('--executor-path', '-e', help='Marvin engine executor jar path', type=click.Path(exists=True))
@@ -626,21 +635,14 @@ def engine_httpserver(ctx, action, params_file, initial_dataset, dataset,
 @click.option('--max-rpc-workers', '-rw', default=multiprocessing.cpu_count(), help='Max number of grpc workers per action')
 @click.pass_context
 def engine_httpserver_cli(ctx, action, params_file, initial_dataset, dataset,
-                      model, metrics, model_protocol, spark_conf, http_host, http_port,
-                      executor_path, max_workers, max_rpc_workers):
-    engine_httpserver(ctx, action, params_file, initial_dataset, dataset,
+                          model, metrics, model_protocol, spark_conf, http_host, http_port,
+                          executor_path, max_workers, max_rpc_workers):
+    engine_httpserver(
+        ctx, action, params_file, initial_dataset, dataset,
         model, metrics, model_protocol, spark_conf, http_host, http_port,
-        executor_path, max_workers, max_rpc_workers)
+        executor_path, max_workers, max_rpc_workers
+    )
 
-
-def generate_rpc_args_params_string(**kwargs):
-    params = []
-    if kwargs is not None:
-        for key,value in kwargs.iteritems():
-            if value is not None:
-                params.append("-{0}".format(str(key)))
-                params.append(str(value))
-    return params
 
 @cli.command('engine-deploy', help='Engine provisioning and deployment command')
 @click.option('--provision', is_flag=True, default=False, help='Forces provisioning')
