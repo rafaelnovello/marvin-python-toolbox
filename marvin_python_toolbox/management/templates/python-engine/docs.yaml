@@ -28,7 +28,7 @@ tags:
 paths:
   /acquisitor/health:
     get:
-      summary: Get service statuswo
+      summary: Get acquisitor's service status
       requestBody:
         description: Use an empty json as body
         required: true
@@ -52,7 +52,7 @@ paths:
     post:
       summary: Run acquisitor
       requestBody:
-        description: Use an empty json as body
+        description: The default value for body is an empty json object
         required: true
         content:
           application/json:
@@ -72,9 +72,9 @@ paths:
           description: Service Unavailable
   /tpreparator/health:
     get:
-      summary: Get service status
+      summary: Get trainer preparator's service status
       requestBody:
-        description: Use an empty json as body
+        description: The default value for body is an empty json object
         required: true
         content:
           application/json:
@@ -96,7 +96,7 @@ paths:
     put:
       summary: Reload artifact for trainer preparator
       requestBody:
-        description: Use an empty json as body
+        description: The default value for body is an empty json object
         required: true
         content:
           application/json:
@@ -118,7 +118,7 @@ paths:
     post:
       summary: Run trainer preparator
       requestBody:
-        description: Use an empty json as body
+        description: The default value for body is an empty json object
         required: true
         content:
           application/json:
@@ -138,9 +138,9 @@ paths:
           description: Service Unavailable
   /trainer/health:
     get:
-      summary: Get service status
+      summary: Get trainer's service status
       requestBody:
-        description: Use an empty json as body
+        description: The default value for body is an empty json object
         required: true
         content:
           application/json:
@@ -162,7 +162,7 @@ paths:
     put:
       summary: Reload artifact for trainer
       requestBody:
-        description: Use an empty json as body
+        description: The default value for body is an empty json object
         required: true
         content:
           application/json:
@@ -184,7 +184,7 @@ paths:
     post:
       summary: Run trainer
       requestBody:
-        description: Use an empty json as body
+        description: The default value for body is an empty json object
         required: true
         content:
           application/json:
@@ -204,9 +204,9 @@ paths:
           description: Service Unavailable
   /evaluator/health:
     get:
-      summary: Get service status
+      summary: Get evaluator's service status
       requestBody:
-        description: Use an empty json as body
+        description: The default value for body is an empty json object
         required: true
         content:
           application/json:
@@ -228,7 +228,7 @@ paths:
     put:
       summary: Reload artifact for evaluator
       requestBody:
-        description: Use an empty json as body
+        description: The default value for body is an empty json object
         required: true
         content:
           application/json:
@@ -250,7 +250,7 @@ paths:
     post:
       summary: Run evaluator
       requestBody:
-        description: Use an empty json as body
+        description: The default value for body is an empty json object
         required: true
         content:
           application/json:
@@ -270,9 +270,9 @@ paths:
           description: Service Unavailable
   /predictor/health:
     get:
-      summary: Get service status
+      summary: Get predictor's service status
       requestBody:
-        description: Use an empty json as body
+        description: The default value for body is an empty json object
         required: true
         content:
           application/json:
@@ -294,7 +294,7 @@ paths:
     put:
       summary: Reload artifact for predictor
       requestBody:
-        description: Use an empty json as body
+        description: The default value for body is an empty json object
         required: true
         content:
           application/json:
@@ -321,9 +321,9 @@ paths:
           description: Service Unavailable
   /predictor:
     post:
-      summary: Do prediction
+      summary: Run predictor
       requestBody:
-        description: Use an empty json as body
+        description: The default value for body is an empty json object
         required: true
         content:
           application/json:
@@ -343,9 +343,9 @@ paths:
           description: Service Unavailable
   /feedback/health:
     get:
-      summary: Get service status
+      summary: Get feedback's service status
       requestBody:
-        description: Use an empty json as body
+        description: The default value for body is an empty json object
         required: true
         content:
           application/json:
@@ -365,9 +365,9 @@ paths:
           description: Service Unavailable
   /feedback/reload?protocol=:
     put:
-      summary: Reload artifact for feedback action
+      summary: Reload artifact for feedback
       requestBody:
-        description: Use an empty json as body
+        description: The default value for body is an empty json object
         required: true
         content:
           application/json:
@@ -394,9 +394,9 @@ paths:
           description: Service Unavailable
   /feedback:
     post:
-      summary: Do feedback action
+      summary: Run feedback
       requestBody:
-        description: Use an empty json as body
+        description: The default value for body is an empty json object
         required: true
         content:
           application/json:
@@ -418,7 +418,7 @@ paths:
     post:
       summary: Do all batch actions (from Acquisitor to Evaluator)
       requestBody:
-        description: Use an empty json as body
+        description: The default value for body is an empty json object
         required: true
         content:
           application/json:
