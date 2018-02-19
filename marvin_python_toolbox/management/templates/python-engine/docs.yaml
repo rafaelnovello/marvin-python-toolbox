@@ -1,11 +1,11 @@
 openapi: "3.0.0"
 info:
   version: 0.0.2
-  title: Marvin Engine Executor API
+  title: {{project.package}} API Doc
   contact:
-      name: Marvin Team
-      email: daniel.takabayashi@b2wdigital.com
-      url: https://github.com/marvin-ai
+      name: mantainer {{mantainer.name}}
+      email: {{mantainer.email}}
+      url: {{project.url}}
   license:
     name: Apache License 2.0
 servers:
@@ -28,7 +28,7 @@ tags:
 paths:
   /acquisitor/health:
     get:
-      summary: Get service status
+      summary: Get service statuswo
       requestBody:
         description: Use an empty json as body
         required: true
