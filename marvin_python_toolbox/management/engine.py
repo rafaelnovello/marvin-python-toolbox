@@ -354,9 +354,10 @@ _orig_type = type
 
 @cli.command('engine-generateenv', help='Generate a new marvin engine environment and install default requirements.')
 @click.argument('engine-path', type=click.Path(exists=True))
-def generate_env(engine_path):
+@click.option('--python', '-p', default='python', help='The Python interpreter to use to create the new environment')
+def generate_env(engine_path, python):
     dir_ = os.path.basename(os.path.abspath(engine_path))
-    venv_name = _create_virtual_env(dir_, engine_path)
+    venv_name = _create_virtual_env(dir_, engine_path, python)
     _call_make_env(venv_name)
 
     print('\nDone!!!!')
@@ -372,7 +373,8 @@ def generate_env(engine_path):
 @click.option('--dest', '-d', envvar='MARVIN_HOME', type=click.Path(exists=True), help='Root folder path for the creation')
 @click.option('--no-env', is_flag=True, default=False, help='Don\'t create the virtual enviroment')
 @click.option('--no-git', is_flag=True, default=False, help='Don\'t initialize the git repository')
-def generate(name, description, mantainer, email, package, dest, no_env, no_git):
+@click.option('--python', '-p', default='python', help='The Python interpreter to use to create the new environment')
+def generate(name, description, mantainer, email, package, dest, no_env, no_git, python):
     type_ = 'python-engine'
     type = _orig_type
 
@@ -439,7 +441,7 @@ def generate(name, description, mantainer, email, package, dest, no_env, no_git)
 
     venv_name = None
     if not no_env:
-        venv_name = _create_virtual_env(dir_, dest)
+        venv_name = _create_virtual_env(dir_, dest, python)
         _call_make_env(venv_name)
 
     if not no_git:
@@ -518,11 +520,11 @@ def _rename_dirs(base, dirs, context):
         print('Renaming {0} as {1}'.format(oldname, newname))
 
 
-def _create_virtual_env(name, dest):
+def _create_virtual_env(name, dest, python):
     venv_name = '{}-env'.format(name).replace('_', '-')
     print('Creating virtualenv: {0}...'.format(venv_name))
 
-    command = ['bash', '-c', '. virtualenvwrapper.sh; mkvirtualenv -a {1} {0}; '.format(venv_name, dest)]
+    command = ['bash', '-c', '. virtualenvwrapper.sh; mkvirtualenv -p {0} -a {1} {2};'.format(python, dest, venv_name)]
 
     try:
         subprocess.Popen(command, env=os.environ).wait()
