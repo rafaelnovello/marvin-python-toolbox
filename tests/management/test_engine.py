@@ -167,7 +167,10 @@ def test_create_virtual_env(Popen_mocked):
     name = "my_project"
     dest = "/tmp/xxx"
     python = "python"
-    Popen_mocked.return_value = 1
+
+    mockx = mock.MagicMock()
+    mockx.wait.return_value = 0
+    Popen_mocked.return_value = mockx
 
     env_name = _create_virtual_env(name, dest, python)
 
