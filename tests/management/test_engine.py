@@ -167,6 +167,7 @@ def test_create_virtual_env(Popen_mocked):
     name = "my_project"
     dest = "/tmp/xxx"
     python = "python"
+    Popen_mocked.return_value = 1
 
     env_name = _create_virtual_env(name, dest, python)
 
