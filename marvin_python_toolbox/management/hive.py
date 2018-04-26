@@ -40,6 +40,10 @@ def cli():
 
 @cli.command('hive-generateconf', help='Generate default configuration file')
 @click.pass_context
+def hive_generateconf_cli(ctx):
+    hive_generateconf(ctx)
+
+
 def hive_generateconf(ctx):
     default_conf = [{
         "origin_host": "xxx_host_name",
@@ -61,6 +65,10 @@ def hive_generateconf(ctx):
 @click.option('--queue', '-h', default='default')
 @click.option('--engine', default=(os.path.relpath(".", "..")), help='Marvin engine name (default is the current folder)')
 @click.pass_context
+def hive_resetremote_cli(ctx, host, engine, queue):
+    hive_resetremote(ctx, host, engine, queue)
+
+
 def hive_resetremote(ctx, host, engine, queue):
     hdi = HiveDataImporter(
         engine=engine,
@@ -71,6 +79,7 @@ def hive_resetremote(ctx, host, engine, queue):
         sample_sql=None,
         max_query_size=None,
         destination_host=None,
+        destination_port=None,
         destination_host_username='vagrant',
         destination_host_password='vagrant',
         destination_hdfs_root_path='/user/hive/warehouse/',
@@ -97,10 +106,21 @@ def hive_resetremote(ctx, host, engine, queue):
 @click.option('--sql-id', '-q', help='If informed the process will be applied exclusivelly for this sample sql')
 @click.option('--conf', '-c', default='hive_dataimport.conf', help='Hive data import configuration file')
 @click.pass_context
+def hive_dataimport_cli(
+    ctx, conf, sql_id, engine, skip_remote_preparation, force_copy_files, validate, force,
+    force_remote, max_query_size, destination_host, destination_port, destination_host_username,
+    destination_host_password, destination_hdfs_root_path
+):
+    hive_dataimport(
+        ctx, conf, sql_id, engine, skip_remote_preparation, force_copy_files, validate, force,
+        force_remote, max_query_size, destination_host, destination_port, destination_host_username,
+        destination_host_password, destination_hdfs_root_path
+    )
+
 def hive_dataimport(
     ctx, conf, sql_id, engine, skip_remote_preparation, force_copy_files, validate, force,
-    force_remote, max_query_size, destination_host, destination_port, destination_host_username, destination_host_password,
-    destination_hdfs_root_path
+    force_remote, max_query_size, destination_host, destination_port, destination_host_username,
+    destination_host_password, destination_hdfs_root_path
 ):
 
     initial_start_time = time.time()
