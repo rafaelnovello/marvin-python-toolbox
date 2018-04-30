@@ -255,10 +255,10 @@ class TestHiveDataImporter:
             destination_port=None,
             destination_host_username=None,
             destination_host_password=None,
-            destination_hdfs_root_path=None,
+            destination_hdfs_root_path='/tmp',
             origin_db='test',
             target_table_name='test',
-            engine=None,
+            engine='test',
             sql_id='test',
             origin_host='test',
             origin_queue='test',
@@ -309,4 +309,70 @@ class TestHiveDataImporter:
         show_log_mocked.assert_has_calls([mock.call(cursor)] * 2)
         assert table_exists is True
 
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.show_log')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.drop_table')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.delete_files')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.get_connection')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter._get_ssh_client')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.generate_table_location')
+    def test_reset_remote_tables_without_valids_tables(self, tb_loc_mock, ssh_cli_mock, conn_mock, 
+        delete_mock, drop_mock, log_mock):
+        cursor = mock.MagicMock()
+        conn = mock.MagicMock()
+        conn.cursor.return_value = cursor
+        cursor.fetchall.return_value = []
+        conn_mock.return_value = conn
 
+        self.hdi.reset_remote_tables()
+
+        conn_mock.assert_called_once_with(
+            host=self.hdi.origin_host, 
+            db=self.hdi.temp_db_name, 
+            queue=self.hdi.origin_queue
+        )
+        log_mock.assert_called_once_with(cursor)
+
+        drop_mock.assert_not_called()
+        tb_loc_mock.assert_not_called()
+        delete_mock.assert_not_called()
+        ssh_cli_mock.assert_not_called()
+
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.show_log')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.drop_table')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.delete_files')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.get_connection')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter._get_ssh_client')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.generate_table_location')
+    def test_reset_remote_tables_with_valids_tables(self, tb_loc_mock, ssh_cli_mock, 
+        conn_mock, delete_mock, drop_mock, log_mock):
+        cursor = mock.MagicMock()
+        conn = mock.MagicMock()
+        conn.cursor.return_value = cursor
+        cursor.fetchall.return_value = [['test']]
+        conn_mock.return_value = conn
+
+        tb_loc_mock.return_value = 'test'
+        ssh_cli_mock.return_value = 'test'
+
+        self.hdi.reset_remote_tables()
+
+        conn_mock.assert_called_once_with(
+            host=self.hdi.origin_host, 
+            db=self.hdi.temp_db_name, 
+            queue=self.hdi.origin_queue
+        )
+        log_mock.assert_called_once_with(cursor)
+
+        drop_mock.assert_called_once_with(conn=conn, table_name="marvin.test")
+        tb_loc_mock.assert_called_once_with(
+            self.hdi.destination_hdfs_root_path,
+            self.hdi.origin_host,
+            self.hdi.temp_db_name + '.db',
+            "test"
+        )
+        delete_mock.assert_called_once_with('test', 'test')
+        ssh_cli_mock.assert_called_once_with(
+            self.hdi.origin_host,
+            self.hdi.destination_host_username,
+            self.hdi.destination_host_password
+        )
