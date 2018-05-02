@@ -265,6 +265,28 @@ class TestHiveDataImporter:
             sample_sql='test',
         )
 
+        self.mock_methods = {
+            'get_createtable_ddl': mock.DEFAULT,
+            'get_partitions': mock.DEFAULT,
+            'has_partitions': mock.DEFAULT,
+            'create_database': mock.DEFAULT,
+            'table_exists': mock.DEFAULT,
+            'drop_table': mock.DEFAULT,
+            'create_table': mock.DEFAULT,
+            'populate_table': mock.DEFAULT,
+            'get_table_location': mock.DEFAULT,
+            'generate_table_location': mock.DEFAULT,
+            'hdfs_dist_copy': mock.DEFAULT,
+            'create_external_table': mock.DEFAULT,
+            'refresh_partitions': mock.DEFAULT,
+            'drop_view': mock.DEFAULT,
+            'create_view': mock.DEFAULT,
+            'validade_query': mock.DEFAULT,
+            'get_connection': mock.DEFAULT,
+            'print_finish_step': mock.DEFAULT,
+            'print_start_step': mock.DEFAULT
+        }
+
     @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.count_rows')
     @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.get_connection')
     @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.retrieve_data_sample')
@@ -376,3 +398,155 @@ class TestHiveDataImporter:
             self.hdi.destination_host_username,
             self.hdi.destination_host_password
         )
+
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.validade_query')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.get_connection')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.print_finish_step')
+    def test_import_sample_with_invalid_query_and_flag_true_stop(self, finish_step_mock, conn_mock, val_query_mock):
+        val_query_mock.return_value = False
+
+        self.hdi.import_sample(validate_query=True)
+
+        val_query_mock.assert_called_once_with()
+        finish_step_mock.assert_called_once_with()
+        conn_mock.assert_not_called()
+
+    @mock.patch('marvin_python_toolbox.management.hive.print')
+    def test_import_sample_with_invalid_query_and_flag_false_dont_stop(self, print_mocked):
+        with mock.patch.multiple('marvin_python_toolbox.management.hive.HiveDataImporter',
+            **self.mock_methods
+        ) as mocks:
+
+            self.hdi.import_sample(validate_query=False)
+
+            assert mocks['print_finish_step'].call_count == 6
+            assert mocks['get_connection'].call_count == 5
+            
+            mocks['validade_query'].assert_not_called()
+
+    @mock.patch('marvin_python_toolbox.management.hive.print')
+    def test_import_sample_with_partitions_stop(self, print_mocked):
+        with mock.patch.multiple('marvin_python_toolbox.management.hive.HiveDataImporter',
+            **self.mock_methods
+        ) as mocks:
+
+            conn = mock.MagicMock()
+            mocks['has_partitions'].return_value = True
+            mocks['get_connection'].return_value = conn
+
+            self.hdi.import_sample(validate_query=True)
+
+            assert mocks['get_connection'].call_count == 2
+            mocks['get_createtable_ddl'].assert_called_once_with(
+                conn=conn,
+                origin_table_name=self.hdi.target_table_name,
+                dest_table_name=self.hdi.temp_table_name
+            )
+            mocks['get_partitions'].assert_called_once_with(
+                mocks['get_createtable_ddl'].return_value
+            )
+            mocks['create_database'].assert_not_called()
+
+    @mock.patch('marvin_python_toolbox.management.hive.print')
+    def test_import_sample_with_create_temp_table_false_dont_call_create_table(self, print_mocked):
+        with mock.patch.multiple('marvin_python_toolbox.management.hive.HiveDataImporter',
+            **self.mock_methods
+        ) as mocks:
+
+            self.hdi.import_sample(create_temp_table=False)
+
+            mocks['table_exists'].assert_not_called()
+            mocks['drop_table'].assert_not_called()
+            mocks['create_table'].assert_not_called()
+            mocks['populate_table'].assert_not_called()
+
+    @mock.patch('marvin_python_toolbox.management.hive.print')
+    def test_import_sample_with_create_temp_table_true_call_create_table(self, print_mocked):
+        with mock.patch.multiple('marvin_python_toolbox.management.hive.HiveDataImporter',
+            **self.mock_methods
+        ) as mocks:
+
+            mocks['has_partitions'].return_value = False
+            self.hdi.import_sample(create_temp_table=True, force_create_remote_table=True)
+
+            assert mocks['drop_table'].call_count == 2
+            assert mocks['create_table'].call_count == 1
+            assert mocks['populate_table'].call_count == 1
+
+
+    @mock.patch('marvin_python_toolbox.management.hive.print')
+    def test_import_sample(self, print_mocked):
+        with mock.patch.multiple('marvin_python_toolbox.management.hive.HiveDataImporter',
+            **self.mock_methods
+        ) as mocks:
+
+            mocks['validade_query'].return_value = True
+            mocks['has_partitions'].return_value = False
+            self.hdi.import_sample()
+
+            assert mocks['print_finish_step'].call_count == 6
+            assert mocks['get_connection'].call_count == 5
+
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.clean_ddl')
+    def test_get_createtable_ddl(self, clean_ddl_mocked):
+        cursor = mock.MagicMock()
+        conn = mock.MagicMock()
+        conn.cursor.return_value = cursor
+        cursor.fetchall.return_value = [['l1'], ['l2']]
+        dll = mock.MagicMock()
+        clean_ddl_mocked.return_value = dll
+
+        self.hdi.get_createtable_ddl(conn, 'marvin', 'test')
+
+        cursor.execute.assert_called_once_with("SHOW CREATE TABLE marvin")
+        clean_ddl_mocked.assert_called_once_with('l1l2', remove_formats=False, remove_general=True)
+        dll.replace.assert_called_once_with('marvin', 'test')
+        cursor.close.assert_called_once_with()
+
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.show_log')
+    def test_execute_db_command(self, show_log_mocked):
+        cursor = mock.MagicMock()
+        conn = mock.MagicMock()
+        conn.cursor.return_value = cursor
+        command = "bla bla bla"
+
+        self.hdi._execute_db_command(conn, command)
+
+        cursor.execute.assert_called_once_with(command)
+        show_log_mocked.assert_called_once_with(cursor)
+        cursor.close.assert_called_once_with()
+
+    @mock.patch('marvin_python_toolbox.management.hive.hive')
+    def test_get_connection(self, pyhive_mocked):
+        host = 'test'
+        self.hdi.get_connection(host, db='DEFAULT', queue='default')
+
+        pyhive_mocked.connect.assert_called_once_with(
+            host=host, database='DEFAULT',
+            configuration={'mapred.job.queue.name': 'default',
+                ' hive.exec.dynamic.partition.mode': 'nonstrict'}
+        )
+
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.show_log')
+    def test_retrieve_data_sample(self, show_log_mocked):
+        cursor = mock.MagicMock()
+        conn = mock.MagicMock()
+        conn.cursor.return_value = cursor
+        cursor.description = [('table.col', 'type')]
+        cursor.fetchall.return_value = ['test']
+
+        full_table_name = 'test'
+        sample_limit = 10
+
+        data = self.hdi.retrieve_data_sample(conn, full_table_name, sample_limit)
+        
+        sql = "SELECT * FROM {} TABLESAMPLE ({} ROWS)".format(full_table_name, sample_limit)
+
+        cursor.execute.assert_called_once_with(sql)
+        assert data['data_header'][0]['col'] == 'col'
+        assert data['data_header'][0]['table'] == 'table'
+        assert data['data_header'][0]['type'] == 'type'
+        assert data['total_lines'] == 1
+        assert data['data'] == ['test']
+        assert data['estimate_query_size'] == 104
+        assert data['estimate_query_mean_per_line'] == 104
