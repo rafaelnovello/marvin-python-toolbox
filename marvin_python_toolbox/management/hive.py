@@ -29,6 +29,8 @@ import hashlib
 
 from .._logging import get_logger
 
+from .._compatibility import six
+
 
 logger = get_logger('management.hive')
 
@@ -176,7 +178,7 @@ def read_config(filename):
         return {}
 
 
-class HiveDataImporter(object):
+class HiveDataImporter():
     def __init__(
         self, origin_host, origin_db, origin_queue, target_table_name, sample_sql, engine,
         max_query_size, destination_host, destination_port, destination_host_username, destination_host_password,

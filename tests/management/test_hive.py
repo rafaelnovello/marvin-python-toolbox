@@ -198,7 +198,7 @@ def test_hive_dataimport_with_config_force_false(import_sample_mocked, table_exi
         sample_sql='test',
     )
 
-    with mock.patch.object(hive.HiveDataImporter, '__new__', return_value=hdi) as new_mocked:
+    with mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter', return_value=hdi):
         hive.hive_dataimport(
             ctx, conf, sql_id, engine, 
             skip_remote_preparation, force_copy_files, validate, force,
