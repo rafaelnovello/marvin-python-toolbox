@@ -248,7 +248,7 @@ def test_read_config_with_not_existing_path(path_mocked, json_mocked):
 
 class TestHiveDataImporter:
 
-    def setup_method(self, method):
+    def setup(self):
         self.hdi = hive.HiveDataImporter(
             max_query_size=None,
             destination_host='test',
