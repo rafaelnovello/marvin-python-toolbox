@@ -634,7 +634,8 @@ class HiveDataImporter(object):
     def get_table_location(self, conn, table_name):
         cursor = conn.cursor()
         cursor.execute("DESCRIBE FORMATTED {}".format(table_name))
-        location = [key[1].strip() for key in cursor.fetchall() if key[0] and key[0].strip().upper() == 'LOCATION:'][0].replace('hdfs://', 'hftp://')
+        location = [key[1].strip() for key in cursor.fetchall() if key[0] and key[0].strip().upper() == 'LOCATION:']
+        location = location[0].replace('hdfs://', 'hftp://')
         cursor.close()
         return location
 

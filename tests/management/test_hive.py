@@ -473,7 +473,6 @@ class TestHiveDataImporter:
             assert mocks['create_table'].call_count == 1
             assert mocks['populate_table'].call_count == 1
 
-
     @mock.patch('marvin_python_toolbox.management.hive.print')
     def test_import_sample(self, print_mocked):
         with mock.patch.multiple('marvin_python_toolbox.management.hive.HiveDataImporter',
@@ -550,3 +549,261 @@ class TestHiveDataImporter:
         assert data['data'] == ['test']
         assert data['estimate_query_size'] == 104
         assert data['estimate_query_mean_per_line'] == 104
+
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.show_log')
+    def test_count_rows(self, show_log_mocked):
+        cursor = mock.MagicMock()
+        conn = mock.MagicMock()
+        cursor.fetchone.return_value = [42]
+        conn.cursor.return_value = cursor
+
+        sql = "SELECT COL1, COL2 FROM TABLE"
+        count = self.hdi.count_rows(conn, sql)
+
+        assert count == 42
+        cursor.execute.assert_called_once_with("SELECT COUNT(1) FROM TABLE")
+        show_log_mocked.assert_called_once_with(cursor)
+        cursor.close.assert_called_once_with()
+
+    @mock.patch('marvin_python_toolbox.management.hive.logger')
+    def test_show_log(self, logger_mocked):
+        cursor = mock.MagicMock()
+        cursor.fetch_logs.return_value = ['log log log']
+
+        self.hdi.show_log(cursor)
+
+        logger_mocked.debug.assert_called_once_with('log log log')
+
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.show_log')
+    def test_save_data(self, show_log_mocked):
+        cursor = mock.MagicMock()
+        conn = mock.MagicMock()
+        conn.cursor.return_value = cursor
+
+        table = 'test'
+        data = {
+            'total_lines': 2,
+            'data_header': [
+                {'col': 'test_col_1'},
+                {'col': 'test_col_2'},
+            ],
+            'data': [
+                'header',
+                'test_val_1',
+                'test_val_2',
+            ]
+        }
+        self.hdi.save_data(conn, table, data)
+
+        dml = "INSERT INTO test (test_col_1, test_col_2) VALUES (%s, %s)"
+        cursor.executemany.assert_called_once_with(dml, [('test_val_1',), ('test_val_2',)])
+        show_log_mocked.assert_called_once_with(cursor)
+        cursor.close.assert_called_once_with()
+
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter._execute_db_command')
+    def test_populate_table_with_partitions(self, exec_comm_mock):
+        conn = None
+        table_name = 'test'
+        sql = 'bla bla bla'
+        partitions = [{'col': 'test1'}, {'col': 'test2'}]
+
+        self.hdi.populate_table(conn, table_name, partitions, sql)
+
+        dml = "INSERT OVERWRITE TABLE test PARTITION (test1, test2) bla bla bla"
+        exec_comm_mock.assert_called_once_with(conn, dml)
+
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter._execute_db_command')
+    def test_populate_table_without_partitions(self, exec_comm_mock):
+        conn = None
+        table_name = 'test'
+        sql = 'bla bla bla'
+        partitions = []
+
+        self.hdi.populate_table(conn, table_name, partitions, sql)
+
+        dml = "INSERT OVERWRITE TABLE test  bla bla bla"
+        exec_comm_mock.assert_called_once_with(conn, dml)
+
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter._execute_db_command')
+    def test_create_view(self, exec_comm_mock):
+        conn = None
+        view_name = 'view_test'
+        table_name = 'table_test'
+
+        self.hdi.create_view(conn, view_name, table_name)
+
+        dml = "CREATE VIEW {0} AS SELECT * FROM {1}".format(view_name, table_name)
+        exec_comm_mock.assert_called_once_with(conn, dml)
+
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter._execute_db_command')
+    def test_refresh_partitions(self, exec_comm_mock):
+        conn = None
+        table_name = 'table_test'
+
+        self.hdi.refresh_partitions(conn, table_name)
+
+        sttmt = "MSCK REPAIR TABLE {0}".format(table_name)
+        exec_comm_mock.assert_called_once_with(conn, sttmt)
+
+    def test_get_table_location(self):
+        cursor = mock.MagicMock()
+        conn = mock.MagicMock()
+        cursor.fetchall.return_value = [[' location: ', ' hdfs://test ']]
+        conn.cursor.return_value = cursor
+        table_name = 'test'
+
+        loc = self.hdi.get_table_location(conn, table_name)
+
+        cursor.execute.assert_called_once_with("DESCRIBE FORMATTED test")
+        assert loc == 'hftp://test'
+
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter._hdfs_commands')
+    def test_delete_files(self, cmd_mocked):
+        ssh = 'ssh'
+        url = 'test.com'
+        self.hdi.delete_files(ssh, url)
+
+        cmd = "hdfs dfs -rm -R 'test.com'"
+        cmd_mocked.assert_called_once_with(ssh, cmd)
+
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter._hdfs_commands')
+    def test_copy_files(self, cmd_mocked):
+        ssh = 'ssh'
+        origin = "/home/"
+        dest = "/tmp/"
+        self.hdi.copy_files(ssh, origin, dest)
+
+        cmd = "hadoop distcp --update '/home/' '/tmp/'"
+        cmd_mocked.assert_called_once_with(ssh, cmd)
+
+    @mock.patch('marvin_python_toolbox.management.hive.logger')
+    def test_hdfs_commands(self, logger_mocked):
+        i = mock.MagicMock()
+        o = mock.MagicMock()
+        e = mock.MagicMock()
+        ssh = mock.MagicMock()
+        o.readlines.return_value = 'output'
+        e.readlines.return_value = 'error'
+        ssh.exec_command.return_value = (i, o, e)
+        cmd = "command"
+
+        out, err = self.hdi._hdfs_commands(ssh, cmd)
+
+        assert (out, err) == ('output', 'error')
+        logger_mocked.debug.assert_any_call("Executing remote command: command")
+        logger_mocked.debug.assert_any_call("output")
+        logger_mocked.debug.assert_any_call("error")
+
+    @mock.patch('marvin_python_toolbox.management.hive.AutoAddPolicy', spec=True)
+    @mock.patch('marvin_python_toolbox.management.hive.SSHClient.connect')
+    @mock.patch('marvin_python_toolbox.management.hive.SSHClient.set_missing_host_key_policy')
+    def test_get_ssh_client(self, set_missing_mocked, connect_mocked, AutoAddPolicyMocked):
+        hdfs_host = 'hdfs://test.com'
+        hdfs_port = '1234'
+        username = 'user'
+        password = 'pass'
+        self.hdi._get_ssh_client(hdfs_host, hdfs_port, username, password)
+
+        set_missing_mocked.assert_called_once_with(AutoAddPolicyMocked.return_value)
+        connect_mocked.assert_called_once_with(
+            hostname=hdfs_host, port=hdfs_port, username=username, password=password
+        )
+
+    @mock.patch('marvin_python_toolbox.management.hive.sys')
+    @mock.patch('marvin_python_toolbox.management.hive.logger')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.copy_files')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.delete_files')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter._hdfs_commands')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter._get_ssh_client')
+    def test_hdfs_dist_copy(self, ssh_cli_mock, hdfs_comm_mock, del_files_mock, copy_mock, logger_mock, sys_mock):
+        hdfs_comm_mock.return_value = (42, None)
+        copy_mock.return_value = (None, None)
+        ssh = mock.MagicMock()
+        ssh_cli_mock.return_value = ssh
+
+        force = False
+        hdfs_host = 'hdfs://test.com'
+        hdfs_port = 1234
+        origin = '/home/'
+        dest = '/tmp/'
+
+        self.hdi.hdfs_dist_copy(force, hdfs_host, hdfs_port, origin, dest, username=None, password=None)
+
+        ssh_cli_mock.assert_called_once_with(hdfs_host, hdfs_port, None, None)
+        del_files_mock.assert_not_called()
+        hdfs_comm_mock.assert_any_call(ssh, "hdfs dfs -ls -R '/home/' | grep -E '^-' | wc -l")
+        hdfs_comm_mock.assert_any_call(ssh, "hdfs dfs -ls -R '/tmp/' | grep -E '^-' | wc -l")
+        logger_mock.debug.assert_not_called()
+        sys_mock.exit.assert_not_called()
+
+    @mock.patch('marvin_python_toolbox.management.hive.sys')
+    @mock.patch('marvin_python_toolbox.management.hive.logger')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.copy_files')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.delete_files')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter._hdfs_commands')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter._get_ssh_client')
+    def test_hdfs_dist_copy_with_force(self, ssh_cli_mock, hdfs_comm_mock, del_files_mock, copy_mock, logger_mock, sys_mock):
+        hdfs_comm_mock.return_value = (42, None)
+        copy_mock.return_value = (None, None)
+        ssh = mock.MagicMock()
+        ssh_cli_mock.return_value = ssh
+
+        force = True
+        hdfs_host = 'hdfs://test.com'
+        hdfs_port = 1234
+        origin = '/home/'
+        dest = '/tmp/'
+
+        self.hdi.hdfs_dist_copy(force, hdfs_host, hdfs_port, origin, dest, username=None, password=None)
+
+        ssh_cli_mock.assert_called_once_with(hdfs_host, hdfs_port, None, None)
+        del_files_mock.assert_called_once_with(ssh, dest)
+        hdfs_comm_mock.assert_any_call(ssh, "hdfs dfs -ls -R '/home/' | grep -E '^-' | wc -l")
+        hdfs_comm_mock.assert_any_call(ssh, "hdfs dfs -ls -R '/tmp/' | grep -E '^-' | wc -l")
+        logger_mock.debug.assert_not_called()
+        sys_mock.exit.assert_not_called()
+
+    @mock.patch('marvin_python_toolbox.management.hive.sys')
+    @mock.patch('marvin_python_toolbox.management.hive.logger')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.copy_files')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.delete_files')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter._hdfs_commands')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter._get_ssh_client')
+    def test_hdfs_dist_copy_error_copy(self, ssh_cli_mock, hdfs_comm_mock, del_files_mock, copy_mock, logger_mock, sys_mock):
+        hdfs_comm_mock.side_effect = [(42, None), (13, None)]
+        copy_mock.return_value = (None, ['error'])
+        ssh = mock.MagicMock()
+        ssh_cli_mock.return_value = ssh
+
+        force = False
+        hdfs_host = 'hdfs://test.com'
+        hdfs_port = 1234
+        origin = '/home/'
+        dest = '/tmp/'
+
+        self.hdi.hdfs_dist_copy(force, hdfs_host, hdfs_port, origin, dest, username=None, password=None)
+
+        ssh_cli_mock.assert_called_once_with(hdfs_host, hdfs_port, None, None)
+        del_files_mock.assert_not_called()
+        hdfs_comm_mock.assert_any_call(ssh, "hdfs dfs -ls -R '/home/' | grep -E '^-' | wc -l")
+        hdfs_comm_mock.assert_any_call(ssh, "hdfs dfs -ls -R '/tmp/' | grep -E '^-' | wc -l")
+        logger_mock.debug.assert_called_once_with('error')
+        sys_mock.exit.assert_called_once_with("Stoping process!")
+
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.clean_ddl')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.create_table')
+    @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.get_table_format')
+    def test_create_external_table(self, table_formar_mock, create_table_mock, clean_ddl_mock):
+        table_formar_mock.return_value = 'test'
+        conn = None
+        temp_table_name = 'temp'
+        ddl = "CREATE TABLE bla bla bla"
+        parquet_file_location = "/tmp/"
+        clean_ddl_mock.return_value = ddl
+
+        self.hdi.create_external_table(conn, temp_table_name, ddl, parquet_file_location)
+
+        table_formar_mock.assert_called_once_with(ddl)
+        clean_ddl_mock.assert_called_once_with(ddl, remove_formats=True, remove_general=False)
+        ddl = "CREATE EXTERNAL TABLE bla bla bla STORED AS test LOCATION '/tmp/'"
+        create_table_mock.assert_called_once_with(conn=conn, table_name=temp_table_name, ddl=ddl)
