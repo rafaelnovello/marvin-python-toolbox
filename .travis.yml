@@ -30,8 +30,8 @@ before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then mkvirtualenv marvin-env         ; fi
 
 install:
-  - make marvin
   - pip install codecov
+  - make marvin
 
 script:
   - marvin test
