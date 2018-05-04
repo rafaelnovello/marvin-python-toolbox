@@ -291,6 +291,7 @@ class TestHiveDataImporter:
     @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.get_connection')
     @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.retrieve_data_sample')
     def test_validade_query(self, retrieve_mocked, connection_mocked, count_rows_mocked):
+        count_rows_mocked.return_value = 1
         connection_mocked.return_value = 'connection_mocked'
         retrieve_mocked.return_value = {'estimate_query_mean_per_line': 42}
 
