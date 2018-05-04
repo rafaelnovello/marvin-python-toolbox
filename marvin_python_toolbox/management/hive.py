@@ -469,7 +469,12 @@ class HiveDataImporter():
 
     @property
     def temp_table_name(self):
-        return "{}_{}_{}_{}".format(self.temp_table_prefix, self.origin_db, self.target_table_name, hashlib.sha1(slugify(self.sample_sql)).hexdigest())
+        return "{}_{}_{}_{}".format(
+            self.temp_table_prefix,
+            self.origin_db,
+            self.target_table_name,
+            hashlib.sha1(slugify(self.sample_sql).encode('utf-8')).hexdigest()
+        )
 
     @property
     def full_table_name(self):

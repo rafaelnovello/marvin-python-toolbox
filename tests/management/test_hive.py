@@ -250,7 +250,7 @@ class TestHiveDataImporter:
 
     def setup(self):
         self.hdi = hive.HiveDataImporter(
-            max_query_size=None,
+            max_query_size=13,
             destination_host='test',
             destination_port=None,
             destination_host_username=None,
@@ -292,6 +292,7 @@ class TestHiveDataImporter:
     @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.retrieve_data_sample')
     def test_validade_query(self, retrieve_mocked, connection_mocked, count_rows_mocked):
         connection_mocked.return_value = 'connection_mocked'
+        retrieve_mocked.return_value = {'estimate_query_mean_per_line': 42}
 
         self.hdi.validade_query()
 
@@ -547,8 +548,6 @@ class TestHiveDataImporter:
         assert data['data_header'][0]['type'] == 'type'
         assert data['total_lines'] == 1
         assert data['data'] == ['test']
-        assert data['estimate_query_size'] == 104
-        assert data['estimate_query_mean_per_line'] == 104
 
     @mock.patch('marvin_python_toolbox.management.hive.HiveDataImporter.show_log')
     def test_count_rows(self, show_log_mocked):
